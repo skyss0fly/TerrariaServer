@@ -1,5 +1,7 @@
 <?php
+namespace TerrariaServer\TerrariaServer;
 
+use TerrariaServer\Internal\Packet;
 // Create a TCP socket
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_bind($socket, '0.0.0.0', 7777);
