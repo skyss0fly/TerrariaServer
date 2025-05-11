@@ -2,7 +2,7 @@
 namespace TerrariaServer\TerrariaServer;
 
 use TerrariaServer\Internal\Packet;
-
+class Server {
 // Create a TCP socket
 $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 socket_bind($socket, '0.0.0.0', 7777);
@@ -91,3 +91,4 @@ while (true) {
 }
 
 socket_close($socket);
+}
