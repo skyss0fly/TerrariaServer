@@ -1,8 +1,6 @@
 <?php
-define('SERVER_PASSWORD', 'test');
-
 namespace TerrariaServer\TerrariaServer;
-
+define('SERVER_PASSWORD', 'test');
 use TerrariaServer\Internal\Packet;
 
 class Server {
@@ -21,7 +19,7 @@ class Server {
         }
     }
 
-    private function handleClient($client): void {
+    private function handleClient($client): bool {
         echo "Waiting for Connect Request (Packet ID 1)\n";
         $packet = $this->readPacket($client);
         if (!$packet || $packet['id'] !== 1) return $this->disconnect($client);
