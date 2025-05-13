@@ -28,10 +28,23 @@ function handleClient($client) {
     echo "Sent Password Request (Packet ID 2)\n";
     writePacket($client, 2, chr(0)); // chr(0) = no password
 
-    // Receive Password Send (Packet ID 3)
-    $packet = readPacket($client);
-    if (!$packet || $packet['id'] !== 3) return disconnect($client);
+   // Receive Password Send (Packet ID 3)
+$packet = readPacket($client);
+if (!$packet || $packet['id'] !== 3) return disconnect($client);
 
+// Read the password string (first byte = length, then content)
+$passwordLength = ord($packet['data'][0]);
+$password = substr($packet['data'], 1, $passwordLength);
+echo "Received password: '$password'\n";
+
+if ($password !== SERVER_PASSWORD) {
+    echo "Incorrect password. Disconnecting.\n";
+    // Optionally send kick (Packet ID 2 with non-zero reason byte)
+    writePacket($client, 2, chr(1)); // 1 = generic failure
+    return disconnect($client);
+}
+
+echo "Password correct.\n";
     // Send World Info (Packet ID 7)
     $worldInfo = getWorldInfo();
     echo "Sent World Info (Packet ID 7)\n";
