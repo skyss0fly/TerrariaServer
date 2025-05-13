@@ -1,4 +1,6 @@
 <?php
+
+
 namespace TerrariaServer\TerrariaServer;
 define('SERVER_PASSWORD', 'test');
 use TerrariaServer\Internal\Packet;
@@ -28,7 +30,7 @@ class Server {
 
         // Send Password Request
         echo "Sent Password Request (Packet ID 2)\n";
-        $this->writePacket($client, 2, chr(0));
+        $this->writePacket($client, 2, chr(1));
 
         // Receive Password
         $packet = $this->readPacket($client);
