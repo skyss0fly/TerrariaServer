@@ -1,5 +1,10 @@
 <?php
+namespace TerrariaServer\TerrariaServer;
 
+use TerrariaServer\Internal\Packet;
+
+class Server {
+define('SERVER_PASSWORD', 'test'); // Set your desired password here
 $server = stream_socket_server("tcp://0.0.0.0:7777", $errno, $errstr);
 if (!$server) {
     die("Error: $errstr ($errno)");
@@ -112,4 +117,5 @@ function writePacket($client, $id, $data) {
 function disconnect($client) {
     echo "Client disconnected or invalid packet.\n";
     fclose($client);
+}
 }
