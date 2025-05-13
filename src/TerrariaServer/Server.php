@@ -1,96 +1,91 @@
 <?php
-namespace TerrariaServer\TerrariaServer;
 
-use TerrariaServer\Internal\Packet;
+$server = stream_socket_server("tcp://0.0.0.0:7777", $errno, $errstr);
+if (!$server) {
+    die("Error: $errstr ($errno)");
+}
 
-class Server {
-    public function run() {
-        // Create a TCP socket
-        $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-        socket_bind($socket, '0.0.0.0', 7777);
-        socket_listen($socket);
-        echo "Terraria TCP Server started on port 7777...\n";
+echo "Server started on port 7777\n";
 
-        while (true) {
-            $client = socket_accept($socket);
-            echo "Client connected.\n";
+while ($client = @stream_socket_accept($server, -1)) {
+    echo "Client connected.\n";
+    handleClient($client);
+}
 
-            while (true) {
-                $packet = Packet::readPacket($client);
-                if (!$packet) {
-                    echo "No data received or client disconnected.\n";
-                    break;
-                }
+function handleClient($client) {
+    echo "Waiting for Connect Request (Packet ID 1)\n";
+    $packet = readPacket($client);
+    if (!$packet || $packet['id'] !== 1) return disconnect($client);
 
-                $packetId = $packet['id'];
-                $data = $packet['data'];
+    echo "Client version: " . parseVersion($packet['data']) . "\n";
 
-                echo "Received Packet ID: $packetId\n";
+    // Send Password Request (Packet ID 2) - No password
+    echo "Sent Password Request (Packet ID 2)\n";
+    writePacket($client, 2, chr(0)); // chr(0) = no password
 
-                switch ($packetId) {
-                    case 1: // Connect Request
-                        echo "Received Connect Request (Packet ID 1)\n";
-                        $version = explode("\0", $data)[0];
-                        echo "Client version: $version\n";
+    // Receive Password Send (Packet ID 3)
+    $packet = readPacket($client);
+    if (!$packet || $packet['id'] !== 3) return disconnect($client);
 
-                        // Send Password Request
-                        Packet::writePacket($client, 2, chr(0));
-                        echo "Sent Password Request (Packet ID 2)\n";
-                        break;
+    // Send World Info (Packet ID 7)
+    $worldInfo = getWorldInfo();
+    echo "Sent World Info (Packet ID 7)\n";
+    writePacket($client, 7, $worldInfo);
 
-                    case 3: // Password Response
-                        echo "Received Password Response (Packet ID 3)\n";
+    // Receive Player Info (Packet ID 4)
+    $packet = readPacket($client);
+    if (!$packet || $packet['id'] !== 4) return disconnect($client);
 
-                        // Send World Info
-                        $worldName = "PHP World";
-                        $worldId = 123456789;
-                        $payload = pack("V", $worldId) . chr(0) . chr(0) . chr(0) . chr(0) .
-                                chr(strlen($worldName)) . $worldName . str_repeat(chr(0), 100);
-                        Packet::writePacket($client, 7, $payload);
-                        echo "Sent World Info (Packet ID 7)\n";
-                        break;
+    // Send Player Slot Assignment (Packet ID 8)
+    echo "Sent Player Slot Assignment (Packet ID 8)\n";
+    writePacket($client, 8, chr(0)); // Assign slot 0
 
-                    case 8: // Player Slot Assignment
-                        $payload = pack("V", 0);
-                        Packet::writePacket($client, 8, $payload);
-                        echo "Sent Player Slot Assignment (Packet ID 8)\n";
-                        break;
+    // Send Player Join (Packet ID 9)
+    echo "Sent Player Join (Packet ID 9)\n";
+    writePacket($client, 9, chr(0)); // Join message
 
-                    case 9: // Player Join
-                        $payload = chr(1) . chr(0) . pack("f", 0.0) . pack("f", 100.0);
-                        Packet::writePacket($client, 9, $payload);
-                        echo "Sent Player Join (Packet ID 9)\n";
-                        break;
+    echo "Handshake complete. Client should now be in world loading phase.\n";
+    sleep(5); // keep connection open briefly
+    echo "No data received or client disconnected.\nConnection closed.\n";
+    fclose($client);
+}
 
-                    case 10: // Player Data Update
-                        $payload = pack("f", 10.0) . pack("f", 100.0);
-                        Packet::writePacket($client, 10, $payload);
-                        echo "Sent Player Data Update (Packet ID 10)\n";
-                        break;
+function parseVersion($data) {
+    return explode("\0", $data)[0]; // version string like "Terraria279"
+}
 
-                    case 13: // Inventory Sync
-                        $payload = pack("V", 123) . pack("V", 1) . pack("V", 0);
-                        Packet::writePacket($client, 13, $payload);
-                        echo "Sent Inventory Data (Packet ID 13)\n";
-                        break;
+function getWorldInfo() {
+    // This is a minimal fake world info payload. Adjust as needed.
+    return pack('fVCa256Va256VCCC',
+        13500.0,          // Time
+        1,                // Daytime (1 = day)
+        0,                // Moon phase
+        'TestWorld',      // World name (null-terminated)
+        12345,            // World ID
+        'WorldSeed123',   // World seed (null-terminated)
+        4200,             // World gen version
+        0, 0, 0           // Difficulty, isHardMode, invasionType
+    );
+}
 
-                    case 16: // Chat Message
-                        $chatMessage = "Hello, world!";
-                        $payload = pack("v", strlen($chatMessage)) . $chatMessage;
-                        Packet::writePacket($client, 16, $payload);
-                        echo "Sent Chat Message (Packet ID 16)\n";
-                        break;
+function readPacket($client) {
+    $header = fread($client, 3);
+    if (strlen($header) < 3) return false;
 
-                    default:
-                        echo "Unexpected Packet ID: $packetId\n";
-                        break;
-                }
-            }
+    $length = unpack('v', substr($header, 0, 2))[0];
+    $id = ord($header[2]);
+    $data = fread($client, $length - 1);
 
-            socket_close($client);
-            echo "Connection closed.\n\n";
-        }
+    return ['id' => $id, 'data' => $data];
+}
 
-        socket_close($socket);
-    }
+function writePacket($client, $id, $data) {
+    $length = strlen($data) + 1;
+    $packet = pack('v', $length) . chr($id) . $data;
+    fwrite($client, $packet);
+}
+
+function disconnect($client) {
+    echo "Client disconnected or invalid packet.\n";
+    fclose($client);
 }
