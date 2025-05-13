@@ -1,10 +1,11 @@
 <?php
+define('SERVER_PASSWORD', 'test'); // Set your desired password here
 namespace TerrariaServer\TerrariaServer;
 
 use TerrariaServer\Internal\Packet;
 
 class Server {
-define('SERVER_PASSWORD', 'test'); // Set your desired password here
+
 $server = stream_socket_server("tcp://0.0.0.0:7777", $errno, $errstr);
 if (!$server) {
     die("Error: $errstr ($errno)");
