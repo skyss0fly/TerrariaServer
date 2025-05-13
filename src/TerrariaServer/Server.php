@@ -77,30 +77,41 @@ class Server {
         );
     }
 
-    private function readPacket($socket): ?array {
-        $header = fread($socket, 3);
-        if ($header === false || strlen($header) < 3) {
-            echo "Failed to read packet header.\n";
-            return null;
-        }
+    private function readPacket($socket) {
+    $header = fread($socket, 3);
+    if ($header === false || strlen($header) < 3) {
+        echo "Failed to read packet header.\n";
+        return null;
+    }
 
-        $unpacked = unpack('vlength/CpacketId', $header);
-        $payloadLength = $unpacked['length'] - 3;
+    $unpacked = unpack('vlength/CpacketId', $header);
+    $length = $unpacked['length'];
+    $packetId = $unpacked['packetId'];
 
-        if ($payloadLength < 0) {
-            echo "Invalid payload length.\n";
-            return null;
-        }
+    echo "Received Packet ID: $packetId | Total Length: $length\n";
 
-        $payload = $payloadLength > 0 ? fread($socket, $payloadLength) : '';
+    $payloadLength = $length - 3;
+    if ($payloadLength < 0) {
+        echo "Invalid payload length: $payloadLength\n";
+        return null;
+    }
+
+    $payload = '';
+    if ($payloadLength > 0) {
+        $payload = fread($socket, $payloadLength);
         if ($payload === false || strlen($payload) < $payloadLength) {
             echo "Failed to read full payload.\n";
             return null;
         }
-
-        return ['id' => $unpacked['packetId'], 'data' => $payload];
     }
 
+    echo "Raw payload (hex): " . bin2hex($payload) . "\n";
+
+    return [
+        'id' => $packetId,
+        'data' => $payload
+    ];
+    }
     private function writePacket($client, $id, $data): void {
         $length = strlen($data) + 1;
         $packet = pack('v', $length) . chr($id) . $data;
