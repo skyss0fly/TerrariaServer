@@ -70,33 +70,37 @@ function getWorldInfo() {
     );
 }
 
-function readPacket($client) {
-    $header = fread($client, 3);
-   if ($header === false || strlen($header) < 3){
-	   return false;
-   }
-   if (strlen($header) < 2) {
-	echo "Header too short to extract length. \n";
-	return null;
+function readPacket($socket) {
+    $header = fread($socket, 3); // 2 bytes length, 1 byte packet ID
+    if ($header === false || strlen($header) < 3) {
+        echo "Failed to read packet header.\n";
+        return null;
+    }
 
-   }	
-  $lengthArr = unpack('vlength', substr($header, 0, 2));
-  $length = $lengthArr['length'] ?? 0;
-  if ($length <= 0) {
-	  echo "Inavlid Packet Length: $length\n";
-	  return null;
-  }
-   
-   $id = ord($header[2]);
-   $data = fread($client, $length - 1);
-   if ($data === false || strlen($data) < ($length - 1)) {
-	   
-	   return false;
-	   
-   }
-   
-   return ['id' => $id, 'data' => $data];
-   
+    $unpacked = unpack('vlength/CpacketId', $header);
+    $length = $unpacked['length'];
+    $packetId = $unpacked['packetId'];
+
+    // Subtract the header bytes (3) since length includes them
+    $payloadLength = $length - 3;
+    if ($payloadLength < 0) {
+        echo "Invalid payload length: $payloadLength\n";
+        return null;
+    }
+
+    $payload = '';
+    if ($payloadLength > 0) {
+        $payload = fread($socket, $payloadLength);
+        if ($payload === false || strlen($payload) < $payloadLength) {
+            echo "Failed to read full payload.\n";
+            return null;
+        }
+    }
+
+    return [
+        'id' => $packetId,
+        'data' => $payload
+    ];
 }
 
 function writePacket($client, $id, $data) {
